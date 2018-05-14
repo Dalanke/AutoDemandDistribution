@@ -8,3 +8,5 @@ C:\Final\P\NodesDemand\NodesDemand\obj\Debug\NodesDemand.csproj.GenerateResource
 C:\Final\P\NodesDemand\NodesDemand\obj\Debug\NodesDemand.csproj.CoreCompileInputs.cache
 C:\Final\P\NodesDemand\NodesDemand\obj\Debug\NodesDemand.exe
 C:\Final\P\NodesDemand\NodesDemand\obj\Debug\NodesDemand.pdb
+C:\Final\P\NodesDemand\NodesDemand\bin\Debug\LinearAlgebra.dll
+C:\Final\P\NodesDemand\NodesDemand\obj\Debug\NodesDemand.csproj.CopyComplete

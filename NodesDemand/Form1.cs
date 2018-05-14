@@ -8,6 +8,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
+using LinearAlgebra;
+using System.IO;
+
 
 namespace NodesDemand
 {
@@ -424,5 +427,161 @@ namespace NodesDemand
                 }
             }
         }
+
+        private void button10_Click(object sender, EventArgs e)
+        {
+            listBox4.Items.Clear();
+            int nodes_num, links_num;
+            ENgetcount(0, out nodes_num);
+            ENgetcount(2, out links_num);                     // get number of links and nodes
+            string[] Tpipes = textBox15.Text.Split(',');
+            int[] T_index = new int[Tpipes.Length];
+            for (int i = 0; i < Tpipes.Length; i++)
+            {
+                ENgetlinkindex(Tpipes[i], out T_index[i]);
+            }                                                 // get index of transmission pipes
+            int controlP;
+            ENgetnodeindex(textBox20.Text,out controlP);
+            int f_node, t_node;
+            string[] Rnode = new string[nodes_num];
+            for (int i = 1; i <=links_num; i++)               //get each node's relevant nodes
+            {
+                ENgetlinknodes(i, out f_node, out t_node);
+                Rnode[f_node - 1] += t_node.ToString() + " ";
+                Rnode[t_node - 1] += f_node.ToString() + " ";
+            }
+            string[] tmpS;
+            int[,] mx = new int[nodes_num,nodes_num];
+            for (int i = 0; i < Rnode.Length; i++)
+            {
+                tmpS = Rnode[i].Substring(0,Rnode[i].Length-1).Split(' ');
+                mx[i, i] = tmpS.Length;
+                foreach (var n in tmpS)
+                {
+                    int y = Convert.ToInt16(n);
+                    mx[i, y-1] = -1;
+                }
+            }
+            mx[controlP-1,controlP-1]-= 1;                  // decrease the number of relevant nodes,as the control point is connected with tank
+            double[,] mx_q = new double[nodes_num-2,1];     // get base demand to creat matrix q  del first one
+            for (int i = 2; i <=nodes_num-1; i++)
+            {
+                float tmp;
+                ENgetnodevalue(i,1,out tmp);
+                mx_q[i-2, 0] = (double)tmp;
+            }
+            double[,] mx_A = new double[nodes_num-2,nodes_num-2];   //del the tank and the first col/row to creat A
+            for (int i = 0; i < nodes_num-2; i++)
+            {
+                for (int j = 0; j < nodes_num-2; j++)
+                {
+                    mx_A[i, j] = mx[i+1, j+1];
+                }
+            }
+            double[,] mx_K = new double[nodes_num-2,1];      //K (start with k2)
+            Matrix A = mx_A;
+            Matrix Q = mx_q;
+            Matrix K = mx_K;
+            K = A.Inverse() * Q;
+            double[][] tmpA = K.ToJaggedArray();
+            double[,] k_arry = new double[nodes_num-2,1];
+            for (int i = 0; i < nodes_num-2; i++)
+            {
+                k_arry[i,0]= tmpA[i][0];
+            }
+            // solve the k1
+            float q1;
+            ENgetnodevalue(1, 1, out q1);
+            double sum=0;
+            for (int i = 0; i < k_arry.Length; i++)
+            {
+                sum += k_arry[i, 0] * mx[0,i+1];
+            }
+            double k1 = ((double)q1 - sum) / mx[0, 0];
+            double[] K_ans = new double[nodes_num-1];
+            K_ans[0] = k1;
+            for (int i = 1; i < K_ans.Length; i++)
+            {
+                K_ans[i] = K[i-1,0];
+            }
+            double[] flow = new double[links_num];
+            for (int i = 1; i <=links_num ; i++)
+            {
+                int typecode = -1;
+                typecode = ENgetlinktype(i , out typecode);
+                int b1 = Array.IndexOf(T_index, i );             //exclude the transmission pipes
+                if ((typecode == 1 || typecode == 0) && b1 == -1)
+                {
+                    int f, t;
+                    ENgetlinknodes(i, out f, out t);
+                    flow[i - 1] =Math.Round(K_ans[f-1] - K_ans[t-1],2);
+                    listBox4.Items.Add("pipe "+i+" "+flow[i-1].ToString()+" L/S");
+                }
+            }
+            
+        }
+
+        private void button11_Click(object sender, EventArgs e)
+        {
+            string fName = "";
+            SaveFileDialog s1 = new SaveFileDialog();
+            s1.DefaultExt = "txt";
+            s1.Filter = "text files|*.txt|all files|*.*";
+            if (s1.ShowDialog() == DialogResult.OK)
+            {
+                fName = s1.FileName;
+            }
+            FileStream fs = new FileStream(fName,FileMode.Create);
+            StreamWriter sw = new StreamWriter(fs);
+            foreach (var n in listBox4.Items)
+            {
+                sw.WriteLine(n);
+            }
+            sw.Flush();
+            sw.Close();
+            fs.Close();
+        }
+
+        private void button12_Click(object sender, EventArgs e)
+        {
+            listBox5.Items.Clear();
+            float d_low = float.Parse(textBox19.Text);
+            float d_high = float.Parse(textBox18.Text);
+            float v_low = float.Parse(textBox16.Text);
+            float v_high = float.Parse(textBox17.Text);
+            int links_num;
+            ENgetcount(2, out links_num);
+            float[] di = new float[links_num];
+            int c = 0;
+            foreach (var n in listBox4.Items)
+            {
+                string[] s = n.ToString().Split(' ');
+                float flow = Math.Abs((float)Convert.ToDouble(s[2]))/1000;
+                float d1 =(float) Math.Sqrt((flow / v_high)/(float)Math.PI)*1000;
+                float d2 = (float)Math.Sqrt((flow / v_low) / (float)Math.PI)*1000;
+                if (d2<d_low)
+                {
+                    di[c]= d_low;
+                }
+                else if (d1>d_high)
+                {
+                    di[c] = d_high;
+                }
+                else
+                {
+                    float min = Math.Max(d_low,d1);
+                    float max = Math.Min(d_high,d2);
+                    int a =Convert.ToInt16(min) / 50;
+                    int b = Convert.ToInt16(max) / 50;
+                    int ans = (a + b)/ 2;
+                    di[c] = ans * 50;
+                }
+                listBox5.Items.Add("pipe"+(c+1)+" "+di[c]+"mm");
+                ENsetlinkvalue(c+ 1, 0, di[c]);
+                c += 1;
+            }
+        }
+
+
     }
 }
