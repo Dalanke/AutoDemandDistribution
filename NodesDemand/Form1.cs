@@ -557,8 +557,8 @@ namespace NodesDemand
             {
                 string[] s = n.ToString().Split(' ');
                 float flow = Math.Abs((float)Convert.ToDouble(s[2]))/1000;
-                float d1 =(float) Math.Sqrt((flow / v_high)/(float)Math.PI)*1000;
-                float d2 = (float)Math.Sqrt((flow / v_low) / (float)Math.PI)*1000;
+                float d1 =(float) Math.Sqrt(4*(flow / v_high)/(float)Math.PI)*1000;
+                float d2 = (float)Math.Sqrt(4*(flow / v_low) / (float)Math.PI)*1000;
                 if (d2<d_low)
                 {
                     di[c]= d_low;
